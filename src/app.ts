@@ -1,23 +1,14 @@
-import axios from 'axios';
-import { IPs } from "@/constant/ip";
+import { request } from 'http';
 import { generateRandomIp } from './helper/ipgenerator';
 import { API_KEY, API_SECRET, TARGET_URL } from './constant/config';
 
-// Helper function to get a random IP from a list
-function getRandomIP(ips: string[]): string {
-    return ips[Math.floor(Math.random() * ips.length)];
-}
-
-// Configuration options
+// Configuration
 const options = {
-    rate: 400,         // Target RPS
-    preAllocatedVUs: 200, // Number of concurrent workers
+    // Target RPS
+    rate: 100,
+    // Number of concurrent workers
+    preAllocatedVUs: 100,
 };
-
-// Simulated sleep function
-function sleep(seconds: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
-}
 
 // Headers for the requests
 const headers = {
@@ -31,53 +22,97 @@ const headers = {
     'Connection': 'keep-alive',
 };
 
-// Main load testing function
+// Tracking variables
+let totalRequests = 0;
+const startTime = Date.now();
+
+// Function to send a single request
+function sendRequest(IP: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const url = new URL(`${TARGET_URL}?ip=${IP}`);
+        const req = request(
+            {
+                hostname: url.hostname,
+                port: url.port,
+                path: url.pathname + url.search,
+                method: 'GET',
+                headers,
+            },
+            (res) => {
+                if (res.statusCode === 200) {
+                    totalRequests++;
+                    console.log(`Request success -> IP: ${IP}`);
+                } else if (res.statusCode === 429) {
+                    console.log('Rate limit exceeded.');
+                } else {
+                    console.error(`Request failed. Status: ${res.statusCode}`);
+                }
+                // Consume response data to free up memory
+                res.on('data', () => {});
+                res.on('end', resolve);
+            }
+        );
+
+        req.on('error', (error) => {
+            console.error(`Request error: ${error.message}`);
+            reject(error);
+        });
+
+        req.end();
+    });
+}
+
+// Main function
 async function loadTest() {
-    const url = TARGET_URL; // Replace with your API endpoint
+    console.log(`Starting load test with ${options.preAllocatedVUs} workers at ${options.rate} RPS.`);
 
     const workers: Promise<void>[] = [];
-    
-    // Create pre-allocated VUs
+
+    // Start workers
     for (let i = 0; i < options.preAllocatedVUs; i++) {
-        workers.push(worker(url, generateRandomIp()));
+        workers.push(worker());
     }
 
-    console.log(`Load test started with ${options.preAllocatedVUs} workers.`);
-    console.log(`Press Ctrl+C to stop the test.`);
+    // Periodically log statistics
+    const statsInterval = setInterval(() => {
+        const elapsedSeconds = (Date.now() - startTime) / 1000;
+        const currentRPS = (totalRequests / elapsedSeconds).toFixed(2);
+        console.log(`Elapsed: ${elapsedSeconds.toFixed(2)}s | Total Requests: ${totalRequests} | RPS: ${currentRPS}`);
+    }, 1000);
 
-    // Wait for all workers to run indefinitely
+    // Graceful shutdown handler
+    process.on('SIGINT', () => {
+        clearInterval(statsInterval);
+        const elapsedSeconds = (Date.now() - startTime) / 1000;
+        const avgRequestsPerMinute = (totalRequests / elapsedSeconds) * 60;
+        console.log(`\n--- Final Stats ---`);
+        console.log(`Total Requests: ${totalRequests}`);
+        console.log(`Total Duration: ${elapsedSeconds.toFixed(2)} seconds`);
+        console.log(`Average Requests per Minute: ${avgRequestsPerMinute.toFixed(2)}`);
+        process.exit(0);
+    });
+
     await Promise.all(workers);
 }
 
-// Worker function that sends requests in an infinite loop
-async function worker(url: string, IP: string) {
+// Worker function
+async function worker() {
+    // RPS per worker
+    const requestsPerWorker = options.rate / options.preAllocatedVUs;
+    // Delay between requests in milliseconds
+    const delay = 1000 / requestsPerWorker;
+
     while (true) {
-
+        const IP = generateRandomIp();
         try {
-            const response = await axios.get(`${url}?ip=${IP}`, { headers });
-
-            // Perform checks on the response
-            if (response.status === 200) {
-                console.log(`Request successful: Status ${response.status}, IP: ${IP}`);
-            } else {
-                console.log(`Unexpected response status: ${response.status}, IP: ${IP}`);
-            }
-        } catch (error: any) {
-            if (error.response) {
-                if (error.response.status === 429) {
-                    console.log('Rate limit exceeded.');
-                } else {
-                    console.error(`Request failed. Status: ${error.response.status}, IP: ${IP}`);
-                }
-            } else {
-                console.error(`Error for IP: ${IP}`, error.message);
-            }
+            await sendRequest(IP);
+        } catch (error) {
+            console.error(`Worker error: ${error.message}`);
         }
-
-        // Simulate sleep between requests
-        await sleep(1 / options.rate); // Adjust sleep time to match target RPS
+        // Controlled delay
+        await new Promise(resolve => setTimeout(resolve, delay));
     }
 }
 
-// Start the load test
-loadTest().catch(err => console.error('Load test encountered an error:', err));
+// Start load test
+loadTest().catch(err => console.error(`Load test error: ${err.message}`));
