@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { IPs } from "@/constant/ip";
 import { generateRandomIp } from './helper/ipgenerator';
+import { API_KEY, API_SECRET, TARGET_URL } from './constant/config';
 
 // Helper function to get a random IP from a list
 function getRandomIP(ips: string[]): string {
@@ -20,8 +21,8 @@ function sleep(seconds: number): Promise<void> {
 
 // Headers for the requests
 const headers = {
-    'x-api-key': 'ak_0682f68dcc21ec672013b4d49b28f8b6b0319b7a52b8060cff3f042f0c88884e',
-    'x-api-secret': 'as_42543e58a649d12663761cfaf73b4970178231fbd2297904fb20c624df77940a',
+    'x-api-key': API_KEY,
+    'x-api-secret': API_SECRET,
     'Content-Type': 'application/json',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
     'Referer': 'https://olx.co.id',
@@ -32,7 +33,7 @@ const headers = {
 
 // Main load testing function
 async function loadTest() {
-    const url = 'http://localhost:3501/api/v1/lookup'; // Replace with your API endpoint
+    const url = TARGET_URL; // Replace with your API endpoint
 
     const workers: Promise<void>[] = [];
     
