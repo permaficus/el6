@@ -1,11 +1,11 @@
 import { request } from 'http';
-import { generateRandomIp } from './helper/ipgenerator';
+import { generateRandomIp, randomIpFromList } from './helper/ipgenerator';
 import { API_KEY, API_SECRET, TARGET_URL } from './constant/config';
 
 // Configuration
 const options = {
     // Target RPS
-    rate: 100,
+    rate: 200,
     // Number of concurrent workers
     preAllocatedVUs: 100,
 };
@@ -62,16 +62,30 @@ function sendRequest(IP: string): Promise<void> {
     });
 }
 
+// Worker function
+async function worker(requestsPerSecond: number) {
+    const delay = 1000 / requestsPerSecond; // Delay between requests in ms
+    while (true) {
+        const IP = randomIpFromList();
+        try {
+            await sendRequest(IP);
+        } catch (error) {
+            console.error(`Worker error: ${error.message}`);
+        }
+        // Controlled delay
+        await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+}
+
 // Main function
 async function loadTest() {
     console.log(`Starting load test with ${options.preAllocatedVUs} workers at ${options.rate} RPS.`);
-
-    const workers: Promise<void>[] = [];
+    // Requests per second per worker
+    const { rate, preAllocatedVUs } = options;
+    const requestsPerWorker = rate / preAllocatedVUs
 
     // Start workers
-    for (let i = 0; i < options.preAllocatedVUs; i++) {
-        workers.push(worker());
-    }
+    const workers = Array.from({ length: options.preAllocatedVUs }, () => worker(requestsPerWorker));
 
     // Periodically log statistics
     const statsInterval = setInterval(() => {
@@ -95,24 +109,5 @@ async function loadTest() {
     await Promise.all(workers);
 }
 
-// Worker function
-async function worker() {
-    // RPS per worker
-    const requestsPerWorker = options.rate / options.preAllocatedVUs;
-    // Delay between requests in milliseconds
-    const delay = 1000 / requestsPerWorker;
-
-    while (true) {
-        const IP = generateRandomIp();
-        try {
-            await sendRequest(IP);
-        } catch (error) {
-            console.error(`Worker error: ${error.message}`);
-        }
-        // Controlled delay
-        await new Promise(resolve => setTimeout(resolve, delay));
-    }
-}
-
 // Start load test
-loadTest().catch(err => console.error(`Load test error: ${err.message}`));
+loadTest().catch((err) => console.error(`Load test error: ${err.message}`));

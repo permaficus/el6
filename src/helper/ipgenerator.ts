@@ -1,3 +1,4 @@
+import { IPs } from "@/constant/ip";
 /**
  * Generate random IP Public for Testing only
  * @returns random ip public
@@ -28,4 +29,11 @@ function isValidPublicIp(ip: any) {
   
     // Check if the IP matches any of the private or reserved ranges
     return !privateRanges.some(range => range.test(ip));
+}
+/**
+ * Simulate reading / lookup ip from data cache (IPv4)
+ * @returns ip from IP list
+ */
+export function randomIpFromList (): string {
+  return IPs[Math.floor(Math.random() * IPs.length)];
 }
