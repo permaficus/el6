@@ -10,7 +10,7 @@ function getRandomIP(ips: string[]): string {
 
 // Configuration options
 const options = {
-    rate: 20,         // Target RPS
+    rate: 400,         // Target RPS
     preAllocatedVUs: 200, // Number of concurrent workers
 };
 

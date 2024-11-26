@@ -1,6 +1,6 @@
 # EL6 Load Testing
 
-EL6 is a custom API load testing tool built with TypeScript, designed to simulate high request rates (e.g., 450 requests per second) without relying on external load testing packages like k6
+EL6 is a custom API load testing tool built with TypeScript, designed to simulate API request rates without relying on external load testing packages like k6
 
 # Motivation
 

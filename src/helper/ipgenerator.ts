@@ -2,7 +2,7 @@
  * Generate random IP Public for Testing only
  * @returns random ip public
  */
-export function generateRandomIp() {
+export function generateRandomIp(): string {
     // Generate each octet (byte) of the IPv4 address
     const randomOctet = () => Math.floor(Math.random() * 255);
   
