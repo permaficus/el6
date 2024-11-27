@@ -1,11 +1,11 @@
 import { request } from 'http';
-import { generateRandomIp, randomIpFromList } from './helper/ipgenerator';
-import { API_KEY, API_SECRET, TARGET_URL } from './constant/config';
+import { generateRandomIp, randomIpFromList } from '@/helper/ipgenerator';
+import { API_KEY, API_SECRET, TARGET_URL } from '@/constant/config';
 
 // Configuration
 const options = {
     // Target RPS
-    rate: 200,
+    rate: 50,
     // Number of concurrent workers
     preAllocatedVUs: 100,
 };
@@ -24,6 +24,7 @@ const headers = {
 
 // Tracking variables
 let totalRequests = 0;
+let failedRequests = 0;
 const startTime = Date.now();
 
 // Function to send a single request
@@ -39,13 +40,14 @@ function sendRequest(IP: string): Promise<void> {
                 headers,
             },
             (res) => {
+                totalRequests++;
                 if (res.statusCode === 200) {
-                    totalRequests++;
                     console.log(`Request success -> IP: ${IP}`);
                 } else if (res.statusCode === 429) {
                     console.log('Rate limit exceeded.');
                 } else {
                     console.error(`Request failed. Status: ${res.statusCode}`);
+                    failedRequests++;
                 }
                 // Consume response data to free up memory
                 res.on('data', () => {});
@@ -66,7 +68,7 @@ function sendRequest(IP: string): Promise<void> {
 async function worker(requestsPerSecond: number) {
     const delay = 1000 / requestsPerSecond; // Delay between requests in ms
     while (true) {
-        const IP = randomIpFromList();
+        const IP = generateRandomIp();
         try {
             await sendRequest(IP);
         } catch (error) {
@@ -101,6 +103,7 @@ async function loadTest() {
         const avgRequestsPerMinute = (totalRequests / elapsedSeconds) * 60;
         console.log(`\n--- Final Stats ---`);
         console.log(`Total Requests: ${totalRequests}`);
+        console.log(`Failed Requests: ${failedRequests}`);
         console.log(`Total Duration: ${elapsedSeconds.toFixed(2)} seconds`);
         console.log(`Average Requests per Minute: ${avgRequestsPerMinute.toFixed(2)}`);
         process.exit(0);
